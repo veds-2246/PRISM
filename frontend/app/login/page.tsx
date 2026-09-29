@@ -15,6 +15,24 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
+
+  async function signIn(emailAddress: string, passwordValue: string) {
+    const supabase = getSupabase();
+
+    if (!supabase) {
+      throw new Error("Supabase is unavailable in this environment.");
+    }
+
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: emailAddress,
+      password: passwordValue,
+    });
+
+    if (authError) {
+      throw authError;
+    }
+  }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -22,27 +40,37 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const supabase = getSupabase();
-
-    if (!supabase) {
-      setError("Supabase is unavailable in this environment.");
+    try {
+      await signIn(email, password);
+      router.push("/dashboard");
+      router.refresh();
+    } catch (authError) {
+      setError(authError instanceof Error ? authError.message : "Unable to sign in.");
       setLoading(false);
+    }
+  }
+
+  async function handleDemoLogin() {
+    setError("");
+    setDemoLoading(true);
+
+    const demoEmail = process.env.NEXT_PUBLIC_DEMO_EMAIL;
+    const demoPassword = process.env.NEXT_PUBLIC_DEMO_PASSWORD;
+
+    if (!demoEmail || !demoPassword) {
+      setError("Demo access is not configured yet.");
+      setDemoLoading(false);
       return;
     }
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (authError) {
-      setError(authError.message);
-      setLoading(false);
-      return;
+    try {
+      await signIn(demoEmail, demoPassword);
+      router.push("/dashboard");
+      router.refresh();
+    } catch (authError) {
+      setError("Demo access is unavailable. Please try again or use an authorized account.");
+      setDemoLoading(false);
     }
-
-    router.push("/dashboard");
-    router.refresh();
   }
 
   return (
@@ -171,9 +199,25 @@ export default function LoginPage() {
             </Button>
           </form>
 
+          <div className="my-6 flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-text-muted">or</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+
+          <Button
+            type="button"
+            variant="secondary"
+            loading={demoLoading}
+            onClick={handleDemoLogin}
+            className="w-full"
+          >
+            Continue as Demo
+          </Button>
+
           <p className="mt-8 text-center text-xs leading-5 text-text-muted">
-            Authorized users only. Access and activity may be recorded for
-            audit purposes.
+            Demo mode provides access to the decision-support workspace using a
+            dedicated demo account. Authorized users can sign in above.
           </p>
         </div>
       </section>
