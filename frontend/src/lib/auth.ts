@@ -24,6 +24,23 @@ function cacheToken(token: string | null) {
   }
 }
 
+async function signInConfiguredDemo(supabase: NonNullable<ReturnType<typeof getSupabase>>) {
+  const demoEmail = process.env.NEXT_PUBLIC_DEMO_EMAIL;
+  const demoPassword = process.env.NEXT_PUBLIC_DEMO_PASSWORD;
+
+  if (!demoEmail || !demoPassword) return null;
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: demoEmail,
+    password: demoPassword,
+  });
+
+  if (error || !data.session?.access_token) return null;
+
+  cacheToken(data.session.access_token);
+  return data.session;
+}
+
 export async function getCurrentUser() {
   const supabase = getSupabase();
   if (!supabase) return null;
@@ -33,8 +50,12 @@ export async function getCurrentUser() {
     error,
   } = await supabase.auth.getUser();
 
-  if (error) {
-    return null;
+  if (error || !user) {
+    // The dashboard is intentionally demo-accessible. If there is no restored
+    // browser session, establish the configured Supabase demo session so that
+    // the protected FastAPI endpoints can still receive a real Bearer token.
+    const demoSession = await signInConfiguredDemo(supabase);
+    return demoSession?.user ?? null;
   }
 
   return user;
@@ -66,10 +87,27 @@ export async function getAccessToken() {
     return refreshedSession.access_token;
   }
 
-  // Fallback for demo navigation/browser contexts where the SSR cookie
-  // storage has not been restored yet. The token was obtained directly from
-  // Supabase during sign-in and is scoped to this browser tab.
-  return readCachedToken();
+  // Validate a cached token before reusing it. This prevents an expired token
+  // from causing repeated 401 responses after a browser refresh.
+  const cachedToken = readCachedToken();
+  if (cachedToken) {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(cachedToken);
+
+    if (!error && user) {
+      return cachedToken;
+    }
+
+    cacheToken(null);
+  }
+
+  // Demo deployments can be opened directly at /dashboard without visiting
+  // /login. In that flow, sign in the configured Supabase demo account here so
+  // every protected backend request still carries a genuine user access token.
+  const demoSession = await signInConfiguredDemo(supabase);
+  return demoSession?.access_token ?? null;
 }
 
 export function cacheAccessToken(token: string | null) {
