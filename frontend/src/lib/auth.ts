@@ -1,6 +1,9 @@
-import { supabase } from "./supabase";
+import { getSupabase } from "./supabase";
 
 export async function getCurrentUser() {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
   const {
     data: { user },
     error,
@@ -14,6 +17,9 @@ export async function getCurrentUser() {
 }
 
 export async function getAccessToken() {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -22,6 +28,9 @@ export async function getAccessToken() {
 }
 
 export async function signOut() {
+  const supabase = getSupabase();
+  if (!supabase) return;
+
   const { error } = await supabase.auth.signOut();
 
   if (error) {
