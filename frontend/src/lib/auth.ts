@@ -1,30 +1,24 @@
-import { supabase } from "./supabase";
+const TOKEN_KEY = "prism_demo_token";
+const USER_ID = "f9108bcd-758c-4187-899f-0be5c204d1d7";
 
 export async function getCurrentUser() {
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error) {
-    return null;
-  }
-
-  return user;
+  if (typeof window === "undefined") return { id: USER_ID, email: "demo@prism-bis.in" };
+  return { id: USER_ID, email: "demo@prism-bis.in", user_metadata: { full_name: "PRISM Demo User" } };
 }
 
 export async function getAccessToken() {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  if (typeof window === "undefined") return "demo-token";
+  const token = window.sessionStorage.getItem(TOKEN_KEY) || "demo-token";
+  window.sessionStorage.setItem(TOKEN_KEY, token);
+  return token;
+}
 
-  return session?.access_token ?? null;
+export function cacheAccessToken(token: string | null) {
+  if (typeof window === "undefined") return;
+  if (token) window.sessionStorage.setItem(TOKEN_KEY, token);
+  else window.sessionStorage.removeItem(TOKEN_KEY);
 }
 
 export async function signOut() {
-  const { error } = await supabase.auth.signOut();
-
-  if (error) {
-    throw error;
-  }
+  if (typeof window !== "undefined") window.sessionStorage.removeItem(TOKEN_KEY);
 }

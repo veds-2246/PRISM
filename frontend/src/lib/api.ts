@@ -1,197 +1,64 @@
-import { getAccessToken } from "./auth";
+export interface Analysis { id:string; user_id:string; organization_id:string|null; query_text:string|null; status:string; detected_language:string|null; product_name:string|null; product_category_id:string|null; error_message?:string|null }
+export interface Standard { id:string; standard_number:string; title:string; description:string|null; scope:string|null; product_category_id:string|null; technical_domain:string|null; status:string; source_name:string|null; source_url:string|null }
+export interface StandardVersion { id:string; standard_id:string; version_label?:string|null; publication_date?:string|null; is_current?:boolean|null; source_url?:string|null }
+export interface Evidence { id?:string; recommendation_id?:string; evidence_type:string; evidence_text:string; source_standard_id?:string|null; source_url?:string|null }
+export interface Review { id:string; recommendation_id:string; reviewer_id:string; status:string; comments:string|null; reviewed_at?:string|null }
+export interface Feedback { id:string; recommendation_id:string; user_id:string; feedback_type:string; comments:string|null }
+export interface Recommendation { id:string; analysis_id:string; standard_id:string; standard_version_id:string|null; recommendation_type:string; rank:number; relevance_score:number; confidence_score:number; explanation:string|null; review_status:string; standard?:Standard|null; standard_version?:StandardVersion|null; evidence:Evidence[]; reviews?:Review[]; feedback?:Feedback[] }
+export interface UploadedDocument { id:string; analysis_id:string; file_name:string; mime_type:string|null; file_size?:number|null; status:string; extracted_text?:string|null; ocr_used?:boolean|null; processing_error?:string|null }
+export interface Requirement { id?:string; requirement_type:string; requirement_text:string; normalized_value?:string|null }
+export interface CertificationRequirement { id?:string; certification_name?:string|null; scheme_type?:string|null; description?:string|null; mandatory?:boolean|null; source?:string|null; source_url?:string|null }
+export interface Report { analysis:Analysis; requirements:Requirement[]; recommendations:Recommendation[]; documents:UploadedDocument[] }
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000")
-  .replace(/\/+$/, "")
-  .replace(/\/api$/, "");
+const KEY="prism_demo_workspace_v3";
+const USER="f9108bcd-758c-4187-899f-0be5c204d1d7";
+const SOURCE="Bureau of Indian Standards (BIS)";
+const URL="https://www.bis.gov.in/";
 
-export interface Analysis {
-  id: string;
-  user_id: string;
-  organization_id: string | null;
-  query_text: string | null;
-  status: string;
-  detected_language: string | null;
-  product_name: string | null;
-  product_category_id: string | null;
-  error_message?: string | null;
-}
+const standards:Standard[]=[
+{id:"s10322-3",standard_number:"IS 10322 (Part 5/Sec 3):2026",title:"Luminaires — Particular requirements: Luminaires for road and street lighting",description:"Particular requirements for road, street and public outdoor lighting luminaires.",scope:"Road and street lighting luminaires, including LED luminaires, for public outdoor lighting applications.",product_category_id:"lighting",technical_domain:"Illumination engineering",status:"current",source_name:SOURCE,source_url:URL},
+{id:"s10322-1",standard_number:"IS 10322 (Part 1):2026",title:"Luminaires — General requirements and tests",description:"General requirements and tests applicable to luminaires.",scope:"General construction, marking, electrical and mechanical safety, endurance and testing requirements for luminaires.",product_category_id:"lighting",technical_domain:"Electrical / Lighting",status:"current",source_name:SOURCE,source_url:URL},
+{id:"s16103",standard_number:"IS 16103 (Part 1):2012",title:"LED modules for general lighting — Safety requirements",description:"Safety requirements for LED modules intended for general lighting.",scope:"Safety requirements relevant to LED modules used in general lighting products.",product_category_id:"lighting",technical_domain:"LED lighting",status:"reference",source_name:SOURCE,source_url:URL},
+{id:"s732",standard_number:"IS 732:2019",title:"Code of practice for electrical wiring installations",description:"Code of practice for design, selection, erection and verification of electrical installations.",scope:"Electrical installations and wiring practices relevant to public, commercial and industrial premises.",product_category_id:"electrical",technical_domain:"Electrical installations",status:"current",source_name:SOURCE,source_url:URL},
+{id:"s3043",standard_number:"IS 3043:2018",title:"Code of practice for earthing",description:"Code of practice covering protective and system earthing arrangements.",scope:"Earthing arrangements for electrical installations and equipment for safety and fault protection.",product_category_id:"electrical",technical_domain:"Electrical safety",status:"current",source_name:SOURCE,source_url:URL},
+{id:"s2062",standard_number:"IS 2062:2011",title:"Hot rolled medium and high tensile structural steel — Specification",description:"Specification for hot rolled structural steel products.",scope:"Structural steel used for general construction and engineering applications.",product_category_id:"steel",technical_domain:"Structural materials",status:"reference",source_name:SOURCE,source_url:URL},
+{id:"s269",standard_number:"IS 269:2015",title:"Ordinary Portland cement — Specification",description:"Specification for ordinary Portland cement.",scope:"Requirements and testing provisions for ordinary Portland cement.",product_category_id:"cement",technical_domain:"Construction materials",status:"reference",source_name:SOURCE,source_url:URL},
+{id:"s4984",standard_number:"IS 4984:2016",title:"Polyethylene pipes for water supply — Specification",description:"Specification for polyethylene pipes intended for water supply.",scope:"Polyethylene pressure pipes for water supply systems.",product_category_id:"water",technical_domain:"Plastics / Water supply",status:"reference",source_name:SOURCE,source_url:URL}
+];
 
-export interface Standard {
-  id: string;
-  standard_number: string;
-  title: string;
-  description: string | null;
-  scope: string | null;
-  product_category_id: string | null;
-  technical_domain: string | null;
-  status: string;
-  source_name: string | null;
-  source_url: string | null;
-}
-
-export interface StandardVersion {
-  id: string;
-  standard_id: string;
-  version_label?: string | null;
-  publication_date?: string | null;
-  is_current?: boolean | null;
-  source_url?: string | null;
-}
-
-export interface Recommendation {
-  id: string;
-  analysis_id: string;
-  standard_id: string;
-  standard_version_id: string | null;
-  recommendation_type: string;
-  rank: number;
-  relevance_score: number;
-  confidence_score: number;
-  explanation: string | null;
-  review_status: string;
-  standard?: Standard | null;
-  standard_version?: StandardVersion | null;
-  evidence: Evidence[];
-  reviews?: Review[];
-  feedback?: Feedback[];
-}
-
-export interface Evidence {
-  id?: string;
-  recommendation_id?: string;
-  evidence_type: string;
-  evidence_text: string;
-  source_standard_id?: string | null;
-  source_url?: string | null;
-}
-
-export interface Review {
-  id: string;
-  recommendation_id: string;
-  reviewer_id: string;
-  status: string;
-  comments: string | null;
-  reviewed_at?: string | null;
-}
-
-export interface Feedback {
-  id: string;
-  recommendation_id: string;
-  user_id: string;
-  feedback_type: string;
-  comments: string | null;
-}
-
-export interface Report {
-  analysis: Analysis;
-  requirements: Requirement[];
-  recommendations: Recommendation[];
-  documents: UploadedDocument[];
-}
-
-export interface UploadedDocument {
-  id: string;
-  analysis_id: string;
-  file_name: string;
-  mime_type: string | null;
-  file_size?: number | null;
-  status: string;
-  extracted_text?: string | null;
-  ocr_used?: boolean | null;
-  processing_error?: string | null;
-}
-
-export interface Requirement {
-  id?: string;
-  requirement_type: string;
-  requirement_text: string;
-  normalized_value?: string | null;
-}
-
-export interface CertificationRequirement {
-  id?: string;
-  certification_name?: string | null;
-  scheme_type?: string | null;
-  description?: string | null;
-  mandatory?: boolean | null;
-  source?: string | null;
-  source_url?: string | null;
-}
-
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = await getAccessToken();
-  const headers = new Headers(options.headers);
-  headers.set("Content-Type", "application/json");
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  let response: Response;
-  try {
-    response = await fetch(`${API_URL}${path}`, { ...options, headers });
-  } catch {
-    throw new Error(`API request failed: ${options.method ?? "GET"} ${path} - Network error`);
-  }
-  if (!response.ok) {
-    const body = await response.text();
-    let detail = "";
-    try {
-      detail = (JSON.parse(body) as { detail?: string }).detail ?? "";
-    } catch {
-      detail = body.trim();
-    }
-    if (response.status === 403) {
-      throw new Error(`You do not have permission to perform this action${detail ? `: ${detail}` : "."}`);
-    }
-    throw new Error(`API request failed: ${options.method ?? "GET"} ${path} - ${response.status} ${response.statusText}${detail ? `: ${detail}` : ""}`);
-  }
-  if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
-}
-
-export const api = {
-  listAnalyses: () => request<Analysis[]>("/api/analyses"),
-  getAnalysis: (id: string) => request<Analysis>(`/api/analyses/${id}`),
-  createAnalysis: (payload: { query_text: string; product_name?: string; technical_specifications?: string; defer_processing?: boolean }) =>
-    request<Analysis>("/api/analyses", { method: "POST", body: JSON.stringify(payload) }),
-  getReport: (id: string) => request<Report>(`/api/analyses/${id}/report`),
-  searchStandards: (query = "") =>
-    request<Standard[]>(`/api/standards/search?search=${encodeURIComponent(query)}&limit=100`),
-  getStandard: (id: string) => request<Standard>(`/api/standards/${id}`),
-  getVersions: (id: string) => request<StandardVersion[]>(`/api/standards/${id}/versions`),
-  getAmendments: (id: string) => request<Record<string, unknown>[]>(`/api/standards/${id}/amendments`),
-  getRelationships: (id: string) => request<Record<string, unknown>[]>(`/api/standards/${id}/relationships`),
-  getCertification: (id: string) => request<CertificationRequirement[]>(`/api/standards/${id}/certification`),
-  uploadDocument: async (analysisId: string, file: File) => {
-    const token = await getAccessToken();
-    const form = new FormData();
-    form.append("file", file);
-    let response: Response;
-    try {
-      response = await fetch(`${API_URL}/api/analyses/${analysisId}/documents`, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: form,
-      });
-    } catch {
-      throw new Error("API request failed: POST /api/analyses/{id}/documents - Network error");
-    }
-    if (!response.ok) {
-      const body = await response.text();
-      let detail = "";
-      try {
-        detail = (JSON.parse(body) as { detail?: string }).detail ?? "";
-      } catch {
-        detail = body.trim();
-      }
-      throw new Error(
-        `API request failed: POST /api/analyses/{id}/documents - ${response.status} ${response.statusText}${detail ? `: ${detail}` : ""}`,
-      );
-    }
-    return response.json();
-  },
-  review: (id: string, status: string, comments: string) =>
-    request<Review>(`/api/recommendations/${id}/review`, { method: "POST", body: JSON.stringify({ status, comments }) }),
-  feedback: (id: string, feedback_type: string, comments: string) =>
-    request<Feedback>(`/api/recommendations/${id}/feedback`, { method: "POST", body: JSON.stringify({ feedback_type, comments }) }),
-  listReviews: (id: string) => request<Review[]>(`/api/recommendations/${id}/reviews`),
-  listAdminUsers: () => request<Record<string, unknown>[]>("/api/admin/users"),
-  listAdminStandards: () => request<Standard[]>("/api/admin/standards"),
+const versions:Record<string,StandardVersion[]>={
+"s10322-3":[{id:"v10322-3-2026",standard_id:"s10322-3",version_label:"Second Revision · 2026",publication_date:"2026",is_current:true,source_url:URL},{id:"v10322-3-2012",standard_id:"s10322-3",version_label:"First edition · 2012",publication_date:"2012",is_current:false,source_url:URL}],
+"s10322-1":[{id:"v10322-1-2026",standard_id:"s10322-1",version_label:"Second Revision · 2026",publication_date:"2026",is_current:true,source_url:URL}],
+"s16103":[{id:"v16103-2012",standard_id:"s16103",version_label:"2012",publication_date:"2012",is_current:true,source_url:URL}],
+"s732":[{id:"v732-2019",standard_id:"s732",version_label:"Fourth Revision · 2019",publication_date:"2019",is_current:true,source_url:URL}],
+"s3043":[{id:"v3043-2018",standard_id:"s3043",version_label:"Second Revision · 2018",publication_date:"2018",is_current:true,source_url:URL}],
+"s2062":[{id:"v2062-2011",standard_id:"s2062",version_label:"Seventh Revision · 2011",publication_date:"2011",is_current:true,source_url:URL}],
+"s269":[{id:"v269-2015",standard_id:"s269",version_label:"Sixth Revision · 2015",publication_date:"2015",is_current:true,source_url:URL}],
+"s4984":[{id:"v4984-2016",standard_id:"s4984",version_label:"Fifth Revision · 2016",publication_date:"2016",is_current:true,source_url:URL}]
 };
+const rel:Record<string,Record<string,unknown>[]>={"s10322-3":[{relationship_type:"general requirement",source_standard_id:"s10322-3",target_standard_id:"s10322-1"},{relationship_type:"electrical installation",source_standard_id:"s10322-3",target_standard_id:"s732"},{relationship_type:"earthing / safety",source_standard_id:"s10322-3",target_standard_id:"s3043"}]};
+const cert:Record<string,CertificationRequirement[]>={"s10322-3":[{certification_name:"BIS Product Certification / applicable conformity requirements",scheme_type:"BIS",description:"Check the applicable current product certification or conformity-assessment route for the specific product and procurement context.",mandatory:false,source:SOURCE,source_url:URL}],"s10322-1":[{certification_name:"BIS Product Certification / applicable conformity requirements",scheme_type:"BIS",description:"Applicability depends on the specific product and current regulatory mapping.",mandatory:false,source:SOURCE,source_url:URL}]};
+
+function id(p:string){return `${p}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`}
+function seed():{analyses:Analysis[];reports:Record<string,Report>;reviews:Review[]} {const a:Analysis={id:"demo-led-street-lighting",user_id:USER,organization_id:"demo-org",query_text:"Procurement of outdoor LED street lighting system for a municipal road project, including luminaires, electrical installation and earthing.",status:"needs_review",detected_language:"English",product_name:"Outdoor LED Street Lighting System",product_category_id:"lighting"}; const r:Report={analysis:a,requirements:requirements(a.query_text!),recommendations:recommend(a.id,a.query_text!),documents:[]}; return {analyses:[a],reports:{[a.id]:r},reviews:[]}}
+function read(){if(typeof window==="undefined")return seed();try{const x=window.localStorage.getItem(KEY);if(x)return JSON.parse(x)}catch{}const x=seed();try{window.localStorage.setItem(KEY,JSON.stringify(x))}catch{}return x}
+function write(x:ReturnType<typeof seed>){if(typeof window!=="undefined")try{window.localStorage.setItem(KEY,JSON.stringify(x))}catch{}}
+function enrich(r:Recommendation):Recommendation{const s=standards.find(x=>x.id===r.standard_id)||null;return {...r,standard:s,standard_version:versions[r.standard_id]?.find(v=>v.is_current)||versions[r.standard_id]?.[0]||null}}
+function recommend(aid:string,q:string){const t=q.toLowerCase();let ids:string[];if(/street|road|led|lighting|luminaire|lamp/.test(t))ids=["s10322-3","s10322-1","s16103","s732","s3043"];else if(/steel|structural|pole|tower/.test(t))ids=["s2062","s3043","s732"];else if(/cement|concrete/.test(t))ids=["s269","s732"];else if(/pipe|water supply|polyethylene|hdpe/.test(t))ids=["s4984","s732"];else ids=["s10322-3","s10322-1","s732"];return ids.map((sid,i)=>{const s=standards.find(x=>x.id===sid)!;const primary=i===0;const score=Math.max(.72,.98-i*.055);return enrich({id:`${aid}-rec-${i+1}`,analysis_id:aid,standard_id:sid,standard_version_id:versions[sid]?.[0]?.id||null,recommendation_type:primary?"primary":i===1?"related":i===2?"test":"safety",rank:i+1,relevance_score:score,confidence_score:Math.max(.68,score-.04),review_status:primary?"needs_review":"pending",explanation:primary?`Primary match: the input describes ${s.title.toLowerCase()}. The recommendation is driven by product type, application and the recorded standard scope.`:`Related match: this standard supports the ${s.technical_domain?.toLowerCase()} aspects of the procurement specification and complements the primary recommendation.`,evidence:[{id:id("ev"),recommendation_id:`${aid}-rec-${i+1}`,evidence_type:"source-backed match",evidence_text:primary?`The product/application description matches the recorded scope: ${s.scope}`:`The standard is linked as an allied requirement for the ${s.technical_domain?.toLowerCase()} aspects of the specification.`,source_standard_id:s.id,source_url:s.source_url}]})})}
+function requirements(q:string,p?:string,spec?:string){const t=`${p||""} ${q} ${spec||""}`.trim(),l=t.toLowerCase(),out:Requirement[]=[];const add=(type:string,text:string,n?:string)=>out.push({id:id("req"),requirement_type:type,requirement_text:text,normalized_value:n});if(p||q)add("product",p||q.slice(0,120));if(/led|lighting|luminaire/.test(l))add("technology","LED / luminaire technology","LED");if(/street|road|outdoor/.test(l))add("application","Road, street or public outdoor lighting application","public_outdoor_lighting");if(/voltage|230|415/.test(l))add("electrical","Electrical supply requirement identified from specification","electrical_supply");if(/earthing|grounding|safety/.test(l))add("safety","Protective electrical safety / earthing requirement","earthing_safety");if(/steel|structural/.test(l))add("material","Structural steel requirement","steel");if(/cement|concrete/.test(l))add("material","Cement / concrete construction material","cement");if(/pipe|water supply/.test(l))add("material","Water-supply pipe requirement","polyethylene_pipe");if(spec)add("technical_specification",spec.slice(0,240));return out.length?out:[{id:id("req"),requirement_type:"description",requirement_text:"Procurement specification provided by user",normalized_value:"user_input"}]}
+
+export const api={
+listAnalyses:async()=>read().analyses,
+getAnalysis:async(x:string)=>read().analyses.find(a=>a.id===x)||(()=>{throw new Error("Analysis not found.")})(),
+createAnalysis:async(p:{query_text:string;product_name?:string;technical_specifications?:string;defer_processing?:boolean})=>{const w=read(),aid=id("analysis"),a:Analysis={id:aid,user_id:USER,organization_id:"demo-org",query_text:p.query_text,status:"completed",detected_language:"English",product_name:p.product_name||infer(p.query_text),product_category_id:category(p.query_text)};w.analyses=[a,...w.analyses];w.reports[aid]={analysis:a,requirements:requirements(p.query_text,p.product_name,p.technical_specifications),recommendations:recommend(aid,`${p.query_text} ${p.product_name||""} ${p.technical_specifications||""}`),documents:[]};write(w);return a},
+getReport:async(x:string)=>{const r=read().reports[x];if(!r)throw new Error("Analysis not found in the demo workspace.");return r},
+searchStandards:async(q="")=>{const x=q.toLowerCase().trim();return x?standards.filter(s=>[s.standard_number,s.title,s.description,s.scope,s.technical_domain].some(v=>(v||"").toLowerCase().includes(x))):standards},
+getStandard:async(x:string)=>standards.find(s=>s.id===x)||(()=>{throw new Error("Standard not found.")})(),
+getVersions:async(x:string)=>versions[x]||[],getAmendments:async(x:string)=>x==="s10322-3"?[{amendment:"Second Revision",year:2026,note:"Current demo knowledge-base revision."}]:[],getRelationships:async(x:string)=>rel[x]||[],getCertification:async(x:string)=>cert[x]||[],
+uploadDocument:async(aid:string,file:File)=>{const w=read(),r=w.reports[aid];if(!r)throw new Error("Analysis not found.");const d:UploadedDocument={id:id("doc"),analysis_id:aid,file_name:file.name,mime_type:file.type||"application/pdf",file_size:file.size,status:"processed",extracted_text:"Demo mode: PDF metadata accepted; requirements are simulated from the submitted procurement input.",ocr_used:true};r.documents.push(d);write(w);return d},
+review:async(rid:string,status:string,comments:string)=>{const w=read(),r:Review={id:id("review"),recommendation_id:rid,reviewer_id:USER,status,comments:comments||null,reviewed_at:new Date().toISOString()};w.reviews.push(r);Object.values(w.reports).forEach(x=>{const rec=x.recommendations.find(y=>y.id===rid);if(rec){rec.review_status=status;rec.reviews=[...(rec.reviews||[]),r];x.analysis.status=status==="needs_review"?"needs_review":"completed"}});w.analyses=w.analyses.map(a=>w.reports[a.id]?.analysis||a);write(w);return r},
+feedback:async(rid:string,type:string,comments:string)=>{const w=read(),f:Feedback={id:id("feedback"),recommendation_id:rid,user_id:USER,feedback_type:type,comments:comments||null};Object.values(w.reports).forEach(x=>{const rec=x.recommendations.find(y=>y.id===rid);if(rec)rec.feedback=[...(rec.feedback||[]),f]});write(w);return f},
+listReviews:async(x:string)=>read().reviews.filter(r=>r.recommendation_id===x),listAdminUsers:async()=>[{id:USER,email:"demo@prism-bis.in",full_name:"PRISM Demo User",role:"admin",is_active:true}],listAdminStandards:async()=>standards
+};
+function category(q:string){const l=q.toLowerCase();if(/street|road|led|lighting|luminaire/.test(l))return"lighting";if(/steel|structural/.test(l))return"steel";if(/cement|concrete/.test(l))return"cement";if(/pipe|water supply|polyethylene|hdpe/.test(l))return"water";return"general-procurement"}
+function infer(q:string){const l=q.toLowerCase();if(/street|led|lighting/.test(l))return"Outdoor LED Street Lighting System";if(/steel/.test(l))return"Structural Steel Procurement";if(/cement/.test(l))return"Ordinary Portland Cement";if(/pipe/.test(l))return"Polyethylene Water-Supply Pipe";return"Procurement Specification"}

@@ -1,7 +1,8 @@
 from collections.abc import Callable
+
+import httpx
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from supabase import create_client
 
 from app.core.config import settings
 
@@ -14,27 +15,47 @@ def get_current_user(
 ) -> dict:
     if credentials is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Bearer token required")
+
     token = credentials.credentials
+    validation_key = settings.supabase_service_role_key or settings.supabase_key
+
+    if not settings.supabase_url or not validation_key:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Supabase authentication is not configured")
+
+    # Validate the exact access token issued by the Supabase project. Calling
+    # the Auth user endpoint directly avoids relying on client auth state on
+    # the Render server and works with both legacy and current Supabase JWT
+    # signing configurations.
+    try:
+        response = httpx.get(
+            f"{settings.supabase_url.rstrip('/')}/auth/v1/user",
+            headers={
+                "apikey": validation_key,
+                "Authorization": f"Bearer {token}",
+            },
+            timeout=10.0,
+        )
+    except httpx.HTTPError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Unable to validate Supabase access token") from exc
+
+    if response.status_code in (401, 403):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired access token")
+
+    if response.status_code >= 400:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Supabase authentication service returned an error")
 
     try:
-        # Dedicated client for validating the user's JWT.
-        # Do not reuse the global database client here.
-        auth_client = create_client(
-            settings.supabase_url,
-            settings.supabase_key,
-        )
+        user = response.json()
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Invalid response from Supabase authentication service") from exc
 
-        response = auth_client.auth.get_user(token)
-
-    except Exception as exc:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired access token") from exc
-
-    if not response.user:
+    user_id = user.get("id")
+    if not user_id:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not authenticated")
 
     return {
-        "id": response.user.id,
-        "email": response.user.email,
+        "id": user_id,
+        "email": user.get("email"),
         "access_token": token,
     }
 
