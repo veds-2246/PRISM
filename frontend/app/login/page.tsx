@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, ShieldCheck } from "lucide-react";
-import { supabase } from "@/src/lib/supabase";
+import { getSupabase } from "@/src/lib/supabase";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
@@ -21,6 +21,14 @@ export default function LoginPage() {
 
     setError("");
     setLoading(true);
+
+    const supabase = getSupabase();
+
+    if (!supabase) {
+      setError("Supabase is unavailable in this environment.");
+      setLoading(false);
+      return;
+    }
 
     const { error: authError } = await supabase.auth.signInWithPassword({
       email,
