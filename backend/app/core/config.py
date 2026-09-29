@@ -8,7 +8,8 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_base_url: str | None = None
     llm_model: str = "gpt-4o-mini"
-    embedding_model: str = "intfloat/multilingual-e5-base"
+    # Lightweight serverless-compatible embedding model used by the Vercel build.
+    embedding_model: str = "prism-hash-768"
     ollama_base_url: str | None = None
     storage_bucket: str = "analysis-documents"
     max_upload_size: int = 10 * 1024 * 1024
