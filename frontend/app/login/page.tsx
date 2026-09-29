@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { cacheAccessToken } from "@/src/lib/auth";
 import { getSupabase } from "@/src/lib/supabase";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -33,17 +34,23 @@ export default function LoginPage() {
       throw authError;
     }
 
-    // Do not navigate until the browser client has a real persisted session.
-    // The dashboard API requires the Supabase access token as a Bearer token.
-    if (!data.session?.access_token) {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session?.access_token) {
-        throw new Error("Sign-in succeeded but no Supabase session was created.");
-      }
+    // The API requires this exact Supabase access token as a Bearer token.
+    // Cache it for the current browser tab as a fallback while the SSR cookie
+    // session is being restored after navigation.
+    if (data.session?.access_token) {
+      cacheAccessToken(data.session.access_token);
+      return;
     }
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      throw new Error("Sign-in succeeded but no Supabase session was created.");
+    }
+
+    cacheAccessToken(session.access_token);
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
