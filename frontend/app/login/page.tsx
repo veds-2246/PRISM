@@ -24,13 +24,25 @@ export default function LoginPage() {
       throw new Error("Supabase is unavailable in this environment.");
     }
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
       email: emailAddress,
       password: passwordValue,
     });
 
     if (authError) {
       throw authError;
+    }
+
+    // Do not navigate until the browser client has a real persisted session.
+    // The dashboard API requires the Supabase access token as a Bearer token.
+    if (!data.session?.access_token) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error("Sign-in succeeded but no Supabase session was created.");
+      }
     }
   }
 
@@ -68,21 +80,19 @@ export default function LoginPage() {
       router.push("/dashboard");
       router.refresh();
     } catch (authError) {
-      setError("Demo access is unavailable. Please try again or use an authorized account.");
+      setError(authError instanceof Error ? authError.message : "Demo access is unavailable.");
       setDemoLoading(false);
     }
   }
 
   return (
     <main className="flex min-h-screen bg-background">
-      {/* Brand panel */}
       <section className="hidden w-1/2 flex-col justify-between bg-primary p-10 text-white lg:flex">
         <div>
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10">
               <ShieldCheck className="h-6 w-6" />
             </div>
-
             <div>
               <p className="text-base font-semibold">BIS Standards</p>
               <p className="text-sm text-white/65">Intelligence</p>
@@ -94,49 +104,34 @@ export default function LoginPage() {
           <p className="mb-4 text-sm font-medium uppercase tracking-widest text-accent-light">
             Smart Procurement Decision Support
           </p>
-
           <h1 className="text-4xl font-semibold leading-tight">
             Identify the Indian Standards that matter to your procurement
             specifications.
           </h1>
-
           <p className="mt-5 max-w-md text-base leading-7 text-white/70">
             Analyze product descriptions and technical requirements to discover
             applicable standards with traceable recommendations and evidence.
           </p>
         </div>
 
-        <p className="text-xs text-white/45">
-          Department of Consumer Affairs
-        </p>
+        <p className="text-xs text-white/45">Department of Consumer Affairs</p>
       </section>
 
-      {/* Login panel */}
       <section className="flex w-full items-center justify-center px-6 py-10 lg:w-1/2">
         <div className="w-full max-w-md">
-          {/* Mobile brand */}
           <div className="mb-10 flex items-center gap-3 lg:hidden">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white">
               <ShieldCheck className="h-5 w-5" />
             </div>
-
             <div>
-              <p className="text-sm font-semibold text-foreground">
-                BIS Standards
-              </p>
+              <p className="text-sm font-semibold text-foreground">BIS Standards</p>
               <p className="text-xs text-text-muted">Intelligence</p>
             </div>
           </div>
 
           <div className="mb-8">
-            <p className="mb-2 text-sm font-medium text-primary">
-              Welcome back
-            </p>
-
-            <h2 className="text-3xl font-semibold tracking-tight text-foreground">
-              Sign in
-            </h2>
-
+            <p className="mb-2 text-sm font-medium text-primary">Welcome back</p>
+            <h2 className="text-3xl font-semibold tracking-tight text-foreground">Sign in</h2>
             <p className="mt-2 text-sm leading-6 text-text-muted">
               Sign in to access the standards recommendation workspace.
             </p>
@@ -166,37 +161,23 @@ export default function LoginPage() {
                 className="pr-11"
                 required
               />
-
               <button
                 type="button"
                 onClick={() => setShowPassword((value) => !value)}
                 className="absolute right-3 top-[34px] flex h-8 w-8 items-center justify-center rounded-md text-text-muted hover:bg-surface-muted hover:text-foreground"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
-                {showPassword ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
 
             {error && (
-              <div
-                role="alert"
-                className="rounded-lg border border-danger/20 bg-danger-bg px-4 py-3 text-sm text-danger"
-              >
+              <div role="alert" className="rounded-lg border border-danger/20 bg-danger-bg px-4 py-3 text-sm text-danger">
                 {error}
               </div>
             )}
 
-            <Button
-              type="submit"
-              loading={loading}
-              className="w-full"
-            >
-              Sign in
-            </Button>
+            <Button type="submit" loading={loading} className="w-full">Sign in</Button>
           </form>
 
           <div className="my-6 flex items-center gap-3">
