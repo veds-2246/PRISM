@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { getSupabase } from "./supabase";
 
 export type AppRole =
   | "admin"
@@ -15,6 +15,9 @@ export interface UserProfile {
 }
 
 export async function getCurrentProfile(): Promise<UserProfile | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
   const {
     data: { user },
     error: authError,
