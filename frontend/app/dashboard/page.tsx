@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { EmptyState, ErrorState, LoadingState } from "@/components/common/States";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { api, type Analysis } from "@/src/lib/api";
+import { getAccessToken } from "@/src/lib/auth";
 import { getCurrentProfile, type UserProfile } from "@/src/lib/profile";
 
 export default function DashboardPage() {
@@ -16,10 +17,23 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    Promise.all([api.listAnalyses(), getCurrentProfile()])
-      .then(([rows, currentProfile]) => { setAnalyses(rows); setProfile(currentProfile); })
-      .catch((reason: Error) => setError(reason.message))
-      .finally(() => setLoading(false));
+    async function loadWorkspace() {
+      try {
+        // Establish/restore the Supabase session before making protected API
+        // requests. This is especially important for direct demo access to
+        // /dashboard, where there was no prior /login navigation.
+        await getAccessToken();
+        const [rows, currentProfile] = await Promise.all([api.listAnalyses(), getCurrentProfile()]);
+        setAnalyses(rows);
+        setProfile(currentProfile);
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "Unable to load workspace.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadWorkspace();
   }, []);
   const completed = analyses.filter((item) => item.status === "completed").length;
   const review = analyses.filter((item) => item.status === "needs_review").length;
